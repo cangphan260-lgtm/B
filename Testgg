@@ -1,0 +1,24 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local PlantRequest = ReplicatedStorage:WaitForChild("PlantRequest")
+local HarvestRequest = ReplicatedStorage:WaitForChild("HarvestRequest")
+local LightningWarning = ReplicatedStorage:WaitForChild("LightningWarning")
+
+PlantRequest.OnServerEvent:Connect(function(player)
+	-- TODO:
+	-- Kiểm tra plot của player
+	-- Kiểm tra hạt giống
+	-- Trồng cây
+end)
+
+HarvestRequest.OnServerEvent:Connect(function(player)
+	-- TODO:
+	-- Kiểm tra cây đã trưởng thành
+	-- Thu hoạch
+	-- Cộng tiền ở SERVER
+end)
+
+-- Khi hệ thống sét chuẩn bị đánh:
+local function warnLightning()
+	LightningWarning:FireAllClients()
+end
