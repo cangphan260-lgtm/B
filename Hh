@@ -1,0 +1,38 @@
+-- LocalScript: AutoHarvestOnLightning.lua
+-- Đặt trong StarterPlayerScripts hoặc StarterCharacterScripts
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+
+-- Khai báo các RemoteEvent (Đảm bảo đã tạo trong ReplicatedStorage)
+local remoteFolder = ReplicatedStorage:WaitForChild("Events", 5) or ReplicatedStorage
+local lightningWarningRemote = remoteFolder:WaitForChild("LightningWarningRemote") -- Event cảnh báo sét
+local harvestRemote = remoteFolder:WaitForChild("HarvestRemote")                   -- Event yêu cầu thu hoạch
+
+-- Trạng thái
+local autoHarvestEnabled = true -- Bật/tắt chế độ tự động thu hoạch
+
+-- [1] Hàm gửi yêu cầu thu hoạch lên Server
+local function harvestTree(treeInstance)
+	if not treeInstance then return end
+	
+	-- Gửi tín hiệu thu hoạch về Server
+	harvestRemote:FireServer(treeInstance)
+	print("[Auto-Harvest] Đã tự động thu hoạch cây trước khi sét đánh:", treeInstance.Name)
+end
+
+-- [2] Lắng nghe cảnh báo sét đánh từ Server
+-- Server sẽ gửi cảnh báo trước khoảng 1-2 giây trước khi tia sét thực sự đánh xuống
+lightningWarningRemote.OnClientEvent:Connect(function(targetTree, timeUntilStrike)
+	if not autoHarvestEnabled then return end
+	
+	-- Kiểm tra xem cây bị sét đánh có thuộc sở hữu của người chơi này hay không
+	if targetTree and targetTree:FindFirstChild("Owner") and targetTree.Owner.Value == player then
+		print(string.format("[CẢNH BÁO] Sét sẽ đánh vào cây sau %.1f giây! Đang tự động thu hoạch...", timeUntilStrike or 0))
+		
+		-- Thực hiện thu hoạch ngay lập tức
+		harvestTree(targetTree)
+	end
+end)
