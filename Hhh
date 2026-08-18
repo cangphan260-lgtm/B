@@ -1,0 +1,393 @@
+--// LIGHTNING PROTECTION TEST
+--// Lightning warning + Auto Harvest + Draggable Menu
+--// Dùng để kiểm thử game của bạn
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local StarterGui = game:GetService("StarterGui")
+local UserInputService = game:GetService("UserInputService")
+
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+--==================================================
+-- SETTINGS
+--==================================================
+
+local ProtectionEnabled = true
+local AutoHarvest = true
+
+local WARNING_COOLDOWN = 5
+local HARVEST_COOLDOWN = 0.15
+
+local lastWarning = 0
+local lastHarvest = 0
+
+-- Các tên có thể liên quan đến hệ thống sét
+local LightningKeywords = {
+	"lightning",
+	"lightningstrike",
+	"thunder",
+	"thunderbolt",
+	"storm",
+	"strike",
+	"weather",
+	"stormevent",
+	"sét",
+	"set"
+}
+
+local HarvestKeywords = {
+	"harvest",
+	"thuhoach",
+	"thu hoạch",
+	"collect",
+	"crop"
+}
+
+--==================================================
+-- GUI
+--==================================================
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "LightningProtectionTest"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
+
+local Main = Instance.new("Frame")
+Main.Size = UDim2.fromOffset(290, 210)
+Main.Position = UDim2.new(0.5, -145, 0.5, -105)
+Main.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+Main.BorderSizePixel = 0
+Main.Parent = ScreenGui
+
+local Corner = Instance.new("UICorner")
+Corner.CornerRadius = UDim.new(0, 14)
+Corner.Parent = Main
+
+--==================================================
+-- DRAG MENU
+--==================================================
+
+local dragging = false
+local dragStart
+local startPosition
+
+local function updateDrag(input)
+	local delta = input.Position - dragStart
+
+	Main.Position = UDim2.new(
+		startPosition.X.Scale,
+		startPosition.X.Offset + delta.X,
+		startPosition.Y.Scale,
+		startPosition.Y.Offset + delta.Y
+	)
+end
+
+Main.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1
+		or input.UserInputType == Enum.UserInputType.Touch then
+
+		dragging = true
+		dragStart = input.Position
+		startPosition = Main.Position
+
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if dragging and (
+		input.UserInputType == Enum.UserInputType.MouseMovement
+		or input.UserInputType == Enum.UserInputType.Touch
+	) then
+		updateDrag(input)
+	end
+end)
+
+--==================================================
+-- TITLE
+--==================================================
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, -50, 0, 45)
+Title.Position = UDim2.fromOffset(10, 5)
+Title.BackgroundTransparency = 1
+Title.Text = "⚡ Lightning Protection"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.TextSize = 19
+Title.Font = Enum.Font.GothamBold
+Title.Parent = Main
+
+--==================================================
+-- CLOSE BUTTON
+--==================================================
+
+local Close = Instance.new("TextButton")
+Close.Size = UDim2.fromOffset(35, 35)
+Close.Position = UDim2.new(1, -42, 0, 8)
+Close.BackgroundTransparency = 1
+Close.Text = "✕"
+Close.TextColor3 = Color3.new(1,1,1)
+Close.TextSize = 20
+Close.Parent = Main
+
+Close.MouseButton1Click:Connect(function()
+	Main.Visible = false
+end)
+
+-- Nút mở lại
+local OpenButton = Instance.new("TextButton")
+OpenButton.Size = UDim2.fromOffset(55, 55)
+OpenButton.Position = UDim2.fromOffset(20, 200)
+OpenButton.BackgroundColor3 = Color3.fromRGB(30,30,35)
+OpenButton.Text = "⚡"
+OpenButton.TextSize = 25
+OpenButton.Visible = false
+OpenButton.Parent = ScreenGui
+
+local OpenCorner = Instance.new("UICorner")
+OpenCorner.CornerRadius = UDim.new(1,0)
+OpenCorner.Parent = OpenButton
+
+Close.MouseButton1Click:Connect(function()
+	Main.Visible = false
+	OpenButton.Visible = true
+end)
+
+OpenButton.MouseButton1Click:Connect(function()
+	Main.Visible = true
+	OpenButton.Visible = false
+end)
+
+--==================================================
+-- BUTTON CREATOR
+--==================================================
+
+local function createButton(y)
+	local Button = Instance.new("TextButton")
+	Button.Size = UDim2.new(1, -30, 0, 45)
+	Button.Position = UDim2.fromOffset(15, y)
+	Button.BackgroundColor3 = Color3.fromRGB(50,50,60)
+	Button.TextColor3 = Color3.new(1,1,1)
+	Button.TextSize = 16
+	Button.Font = Enum.Font.GothamBold
+	Button.Parent = Main
+
+	local C = Instance.new("UICorner")
+	C.CornerRadius = UDim.new(0, 9)
+	C.Parent = Button
+
+	return Button
+end
+
+local ProtectionButton = createButton(55)
+local HarvestButton = createButton(110)
+
+local Status = Instance.new("TextLabel")
+Status.Size = UDim2.new(1, -30, 0, 30)
+Status.Position = UDim2.fromOffset(15, 165)
+Status.BackgroundTransparency = 1
+Status.TextColor3 = Color3.fromRGB(180,180,180)
+Status.TextSize = 13
+Status.Font = Enum.Font.Gotham
+Status.Parent = Main
+
+local function updateMenu()
+	ProtectionButton.Text =
+		"⚡ Chống sét: " .. (ProtectionEnabled and "ON" or "OFF")
+
+	HarvestButton.Text =
+		"🌱 Tự thu hoạch: " .. (AutoHarvest and "ON" or "OFF")
+
+	Status.Text =
+		ProtectionEnabled
+		and "Đang theo dõi dấu hiệu sét"
+		or "Đã tắt bảo vệ"
+end
+
+updateMenu()
+
+ProtectionButton.MouseButton1Click:Connect(function()
+	ProtectionEnabled = not ProtectionEnabled
+	updateMenu()
+end)
+
+HarvestButton.MouseButton1Click:Connect(function()
+	AutoHarvest = not AutoHarvest
+	updateMenu()
+end)
+
+--==================================================
+-- NOTIFICATION
+--==================================================
+
+local function notify(title, message)
+	pcall(function()
+		StarterGui:SetCore("SendNotification", {
+			Title = title,
+			Text = message,
+			Duration = 5
+		})
+	end)
+end
+
+--==================================================
+-- NAME DETECTOR
+--==================================================
+
+local function containsKeyword(name, keywords)
+	name = string.lower(name)
+
+	for _, keyword in ipairs(keywords) do
+		if string.find(name, keyword, 1, true) then
+			return true
+		end
+	end
+
+	return false
+end
+
+--==================================================
+-- AUTO HARVEST
+--==================================================
+
+local function tryHarvest()
+	if not AutoHarvest then
+		return
+	end
+
+	if os.clock() - lastHarvest < HARVEST_COOLDOWN then
+		return
+	end
+
+	lastHarvest = os.clock()
+
+	for _, object in ipairs(Workspace:GetDescendants()) do
+
+		if object:IsA("ProximityPrompt") then
+
+			local parentName = object.Parent and object.Parent.Name or ""
+
+			if containsKeyword(object.Name, HarvestKeywords)
+				or containsKeyword(parentName, HarvestKeywords) then
+
+				if object.Enabled then
+					pcall(function()
+						fireproximityprompt(object)
+					end)
+				end
+			end
+		end
+	end
+end
+
+--==================================================
+-- LIGHTNING WARNING
+--==================================================
+
+local function lightningWarning(reason)
+	if not ProtectionEnabled then
+		return
+	end
+
+	if os.clock() - lastWarning < WARNING_COOLDOWN then
+		return
+	end
+
+	lastWarning = os.clock()
+
+	notify(
+		"⚡ CẢNH BÁO SÉT!",
+		"Sét chuẩn bị đánh!\n" .. reason
+	)
+
+	-- Thu hoạch ngay khi phát hiện dấu hiệu
+	tryHarvest()
+end
+
+--==================================================
+-- WORKSPACE DETECTOR
+--==================================================
+
+Workspace.DescendantAdded:Connect(function(object)
+
+	if not ProtectionEnabled then
+		return
+	end
+
+	if containsKeyword(object.Name, LightningKeywords) then
+		lightningWarning(
+			"Phát hiện: " .. object.Name
+		)
+	end
+
+end)
+
+--==================================================
+-- LIGHTING DETECTOR
+--==================================================
+
+local oldBrightness = Lighting.Brightness
+local oldAmbient = Lighting.Ambient
+local oldOutdoor = Lighting.OutdoorAmbient
+
+task.spawn(function()
+
+	while task.wait(0.1) do
+
+		if not ProtectionEnabled then
+			continue
+		end
+
+		local brightnessChanged =
+			math.abs(Lighting.Brightness - oldBrightness) > 0.35
+
+		local ambientChanged =
+			(Lighting.Ambient - oldAmbient).Magnitude > 0.15
+
+		local outdoorChanged =
+			(Lighting.OutdoorAmbient - oldOutdoor).Magnitude > 0.15
+
+		if brightnessChanged
+			or ambientChanged
+			or outdoorChanged then
+
+			lightningWarning(
+				"Phát hiện thay đổi ánh sáng/thời tiết"
+			)
+
+			oldBrightness = Lighting.Brightness
+			oldAmbient = Lighting.Ambient
+			oldOutdoor = Lighting.OutdoorAmbient
+		end
+	end
+
+end)
+
+--==================================================
+-- INITIAL SCAN
+--==================================================
+
+for _, object in ipairs(Workspace:GetDescendants()) do
+
+	if containsKeyword(object.Name, LightningKeywords) then
+		print(
+			"[LightningProtection] Found:",
+			object:GetFullName()
+		)
+	end
+
+end
+
+notify(
+	"🛡️ Lightning Protection",
+	"Đã khởi động chế độ thử nghiệm."
+)
+
+print("[LightningProtection] Loaded successfully.")
