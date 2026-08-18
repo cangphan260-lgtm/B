@@ -1,0 +1,89 @@
+-- LocalScript đặt trong StarterPlayerScripts hoặc StarterGui
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- [1] HÀM KÍCH HOẠT NÚT THU HOẠCH TRÊN GIAO DIỆN (UI)
+local function triggerHarvestButton()
+	-- Quét toàn bộ Gui để tìm Button "Thu hoạch" hoặc "Sưu tầm"
+	for _, gui in ipairs(playerGui:GetChildren()) do
+		if gui:IsA("ScreenGui") then
+			for _, element in ipairs(gui:GetDescendants()) do
+				if element:IsA("TextButton") or element:IsA("ImageButton") then
+					local text = element:IsA("TextButton") and element.Text or element.Name
+					if string.find(text, "Thu hoạch") or string.find(text, "Sưu tầm") or string.find(text, "Harvest") then
+						-- Kích hoạt event nhấn nút của UI
+						for _, connection in ipairs(getconnections(element.MouseButton1Click)) do
+							connection:Fire()
+						end
+						for _, connection in ipairs(getconnections(element.Activated)) do
+							connection:Fire()
+						end
+						print("[AUTO-SYSTEM] Đã kích hoạt thu hoạch qua UI!")
+					end
+				end
+			end
+		end
+	end
+end
+
+-- [2] BẮT TẤT CẢ REMOTE EVENT LIÊN QUAN TỚI THU HOẠCH/BÁN
+local function fireAllHarvestRemotes()
+	for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+		if obj:IsA("RemoteEvent") then
+			local name = string.lower(obj.Name)
+			if string.find(name, "harvest") or string.find(name, "collect") or string.find(name, "sell") or string.find(name, "thuhoach") then
+				obj:FireServer()
+			end
+		end
+	end
+end
+
+-- [3] HÀM THU HOẠCH KHẨN CẤP (Xử lý đa tầng)
+local function executeEmergencyHarvest()
+	-- Tầng 1: Bấm nút UI trên màn hình
+	triggerHarvestButton()
+	
+	-- Tầng 2: Gửi Remote Event
+	fireAllHarvestRemotes()
+	
+	-- Tầng 3: Tương tác trực tiếp với các ProximityPrompt/ClickDetector trên cây
+	for _, obj in ipairs(Workspace:GetDescendants()) do
+		if obj:IsA("ProximityPrompt") then
+			fireproximityprompt(obj)
+		elseif obj:IsA("ClickDetector") then
+			fireclickdetector(obj)
+		end
+	end
+end
+
+-- [4] PHÁT HIỆN SÉT ĐÁNH QUA BẦU TRỜI & THỜI TIẾT (Trời tối/Mây đen)
+Lighting.Changed:Connect(function(property)
+	-- Khi thời tiết thay đổi đột ngột (Mây đen bao phủ như trong video)
+	if property == "ClockTime" or property == "Brightness" or property == "OutdoorAmbient" then
+		if Lighting.Brightness < 1 or Lighting.ClockTime > 18 or Lighting.ClockTime < 6 then
+			executeEmergencyHarvest()
+		end
+	end
+end)
+
+-- [5] QUÉT HIỆU ỨNG TIA SÉT HOẶC HẠT GIỐNG BỊ SỐC ĐIỆN
+Workspace.ChildAdded:Connect(function(child)
+	local name = string.lower(child.Name)
+	-- Phát hiện Model Lightning/Sét xuất hiện trên Workspace
+	if string.find(name, "lightning") or string.find(name, "strike") or string.find(name, "set") then
+		print("[WARNING] Phát hiện sét đánh! Thu hoạch ngay!")
+		executeEmergencyHarvest()
+	end
+end)
+
+-- Loop kiểm tra liên tục mỗi 0.1s nếu có nút "Sưu tầm" (như ở giây 0:09 trong video)
+task.spawn(function()
+	while task.wait(0.1) do
+		triggerHarvestButton()
+	end
+end)
