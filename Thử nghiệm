@@ -1,0 +1,288 @@
+--// LIGHTNING AUTO HARVEST - CLIENT TEST
+--// LocalScript
+--// Dùng trong game của bạn để thử nghiệm
+
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+
+local Player = Players.LocalPlayer
+
+--==================================================
+-- SETTINGS
+--==================================================
+
+local Config = {
+    Enabled = true,
+
+    -- Khoảng cách tối đa để thu hoạch
+    HarvestDistance = 80,
+
+    -- Thời gian kiểm tra
+    ScanDelay = 0.15,
+
+    -- Khi phát hiện bão/sét thì thu hoạch
+    AutoHarvest = true,
+
+    -- Hiện thông báo
+    Notification = true,
+
+    -- Phát hiện trời tối bất thường
+    DetectDarkSky = true,
+
+    -- Brightness dưới mức này được xem là dấu hiệu bão
+    DarkBrightness = 1.5,
+
+    -- Tên object có thể là hiệu ứng sét/bão
+    StormNames = {
+        "Lightning",
+        "Thunder",
+        "Storm",
+        "Thunderstorm",
+        "Electric",
+        "Strike",
+        "Rain",
+        "DarkCloud",
+    }
+}
+
+--==================================================
+-- NOTIFICATION
+--==================================================
+
+local function Notify(text)
+    if not Config.Notification then
+        return
+    end
+
+    pcall(function()
+        game:GetService("StarterGui"):SetCore(
+            "SendNotification",
+            {
+                Title = "⚡ Auto Lightning",
+                Text = text,
+                Duration = 3
+            }
+        )
+    end)
+end
+
+--==================================================
+-- CHARACTER
+--==================================================
+
+local function GetRoot()
+    local Character = Player.Character
+
+    if not Character then
+        return nil
+    end
+
+    return Character:FindFirstChild("HumanoidRootPart")
+end
+
+--==================================================
+-- KIỂM TRA OBJECT CÓ PHẢI HIỆU ỨNG SÉT/BÃO
+--==================================================
+
+local function IsStormObject(obj)
+    local name = string.lower(obj.Name)
+
+    for _, keyword in ipairs(Config.StormNames) do
+        if string.find(name, string.lower(keyword), 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
+
+--==================================================
+-- PHÁT HIỆN SÉT/BÃO TRONG WORKSPACE
+--==================================================
+
+local function DetectStormObject()
+
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+
+        if IsStormObject(obj) then
+            return true
+        end
+
+    end
+
+    return false
+end
+
+--==================================================
+-- PHÁT HIỆN TRỜI TỐI
+--==================================================
+
+local function DetectDarkSky()
+
+    if not Config.DetectDarkSky then
+        return false
+    end
+
+    local brightness = Lighting.Brightness
+
+    if brightness <= Config.DarkBrightness then
+        return true
+    end
+
+    return false
+end
+
+--==================================================
+-- TÌM PROXIMITY PROMPT THU HOẠCH
+--==================================================
+
+local function IsHarvestPrompt(prompt)
+
+    local name = string.lower(prompt.Name)
+
+    if string.find(name, "harvest", 1, true) then
+        return true
+    end
+
+    if string.find(name, "thu", 1, true) then
+        return true
+    end
+
+    if string.find(name, "collect", 1, true) then
+        return true
+    end
+
+    if string.find(name, "pick", 1, true) then
+        return true
+    end
+
+    return false
+end
+
+--==================================================
+-- KHOẢNG CÁCH
+--==================================================
+
+local function GetDistance(part)
+
+    local root = GetRoot()
+
+    if not root then
+        return math.huge
+    end
+
+    if not part then
+        return math.huge
+    end
+
+    return (root.Position - part.Position).Magnitude
+end
+
+--==================================================
+-- TỰ ĐỘNG THU HOẠCH
+--==================================================
+
+local function Harvest()
+
+    if not Config.AutoHarvest then
+        return
+    end
+
+    local root = GetRoot()
+
+    if not root then
+        return
+    end
+
+    local count = 0
+
+    for _, obj in ipairs(Workspace:GetDescendants()) do
+
+        if obj:IsA("ProximityPrompt") then
+
+            if IsHarvestPrompt(obj) then
+
+                local parent = obj.Parent
+
+                if parent and parent:IsA("BasePart") then
+
+                    local distance = GetDistance(parent)
+
+                    if distance <= Config.HarvestDistance then
+
+                        pcall(function()
+
+                            fireproximityprompt(obj)
+
+                        end)
+
+                        count += 1
+                    end
+                end
+            end
+        end
+    end
+
+    if count > 0 then
+        Notify("🌱 Đã tự động thu hoạch: " .. count)
+    end
+end
+
+--==================================================
+-- PHÁT HIỆN SÉT
+--==================================================
+
+local StormDetected = false
+
+local function CheckLightning()
+
+    local detected = false
+
+    -- Phát hiện object hiệu ứng sét
+    if DetectStormObject() then
+        detected = true
+    end
+
+    -- Phát hiện trời chuyển tối
+    if DetectDarkSky() then
+        detected = true
+    end
+
+    -- Chuyển từ KHÔNG có bão -> CÓ bão
+    if detected and not StormDetected then
+
+        StormDetected = true
+
+        Notify("⚡ Phát hiện dấu hiệu sét! Đang thu hoạch...")
+
+        task.spawn(function()
+            Harvest()
+        end)
+
+    elseif not detected then
+
+        StormDetected = false
+
+    end
+end
+
+--==================================================
+-- LOOP
+--==================================================
+
+Notify("⚡ Lightning Auto Harvest đã bật")
+
+task.spawn(function()
+
+    while Config.Enabled do
+
+        pcall(function()
+            CheckLightning()
+        end)
+
+        task.wait(Config.ScanDelay)
+
+    end
+
+end)
